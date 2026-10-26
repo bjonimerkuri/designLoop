@@ -1,0 +1,16 @@
+FROM mcr.microsoft.com/playwright:v1.49.1-jammy
+
+WORKDIR /app
+
+COPY package.json tsconfig.base.json ./
+COPY packages/shared ./packages/shared
+COPY packages/agent-core ./packages/agent-core
+
+RUN npm install --no-audit --no-fund --workspace @designloop/agent-core --workspace @designloop/shared
+RUN npm run build -w @designloop/shared && npm run build -w @designloop/agent-core
+
+ENV NODE_ENV=production
+ENV CHROMIUM_NO_SANDBOX=true
+ENV HOME=/tmp
+
+ENTRYPOINT ["node", "packages/agent-core/dist/sandbox-runner.js"]

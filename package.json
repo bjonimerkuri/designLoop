@@ -1,0 +1,35 @@
+{
+  "name": "designloop",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build -w @designloop/shared && npm run build -w @designloop/agent-core",
+    "browsers": "npx playwright install chromium",
+    "db:up": "docker compose up -d",
+    "db:migrate": "npm run prisma:migrate -w @designloop/api",
+    "dev:api": "npm run dev -w @designloop/api",
+    "dev:web": "npm run dev -w @designloop/web",
+    "test": "npm test --workspaces --if-present",
+    "eval:fixtures": "npm run fixtures -w @designloop/evals",
+    "eval": "npm run run -w @designloop/evals --",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "eval:compare": "npm run compare -w @designloop/evals --",
+    "sandbox:build": "docker build -f Dockerfile.sandbox -t designloop-sandbox .",
+    "db:push": "npm run prisma:push -w @designloop/api",
+    "doctor": "node scripts/doctor.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "eslint": "^9.14.0",
+    "prettier": "^3.3.0",
+    "typescript-eslint": "^8.15.0"
+  }
+}
