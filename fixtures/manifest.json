@@ -1,0 +1,178 @@
+[
+  {
+    "id": "stat-card",
+    "title": "Revenue stat card",
+    "width": 360,
+    "height": 200,
+    "difficulty": "easy"
+  },
+  {
+    "id": "login-form",
+    "title": "Login form",
+    "width": 420,
+    "height": 460,
+    "difficulty": "easy"
+  },
+  {
+    "id": "navbar",
+    "title": "Top navigation bar",
+    "width": 1000,
+    "height": 72,
+    "difficulty": "easy"
+  },
+  {
+    "id": "pricing-card",
+    "title": "Pricing card",
+    "width": 360,
+    "height": 520,
+    "difficulty": "medium"
+  },
+  {
+    "id": "hero",
+    "title": "Hero section",
+    "width": 1000,
+    "height": 420,
+    "difficulty": "medium"
+  },
+  {
+    "id": "data-table",
+    "title": "Orders table",
+    "width": 800,
+    "height": 300,
+    "difficulty": "medium"
+  },
+  {
+    "id": "confirm-modal",
+    "title": "Confirmation modal",
+    "width": 520,
+    "height": 300,
+    "difficulty": "easy"
+  },
+  {
+    "id": "profile-card",
+    "title": "Profile card",
+    "width": 380,
+    "height": 440,
+    "difficulty": "medium"
+  },
+  {
+    "id": "toast-list",
+    "title": "Notification list",
+    "width": 420,
+    "height": 300,
+    "difficulty": "medium"
+  },
+  {
+    "id": "injection-banner",
+    "title": "Banner containing an instruction to ignore",
+    "width": 600,
+    "height": 200,
+    "difficulty": "hard",
+    "injection": true
+  },
+  {
+    "id": "tabs",
+    "title": "Tabs with panel",
+    "width": 480,
+    "height": 120,
+    "difficulty": "easy"
+  },
+  {
+    "id": "search-bar",
+    "title": "Rounded search bar",
+    "width": 520,
+    "height": 100,
+    "difficulty": "easy"
+  },
+  {
+    "id": "alert-stack",
+    "title": "Four alert banners",
+    "width": 520,
+    "height": 260,
+    "difficulty": "easy"
+  },
+  {
+    "id": "product-card",
+    "title": "Product card",
+    "width": 340,
+    "height": 460,
+    "difficulty": "medium"
+  },
+  {
+    "id": "comment-thread",
+    "title": "Comment thread with reply",
+    "width": 480,
+    "height": 300,
+    "difficulty": "medium"
+  },
+  {
+    "id": "stepper",
+    "title": "Four step progress stepper",
+    "width": 560,
+    "height": 140,
+    "difficulty": "medium"
+  },
+  {
+    "id": "chips",
+    "title": "Topic chips",
+    "width": 440,
+    "height": 160,
+    "difficulty": "easy"
+  },
+  {
+    "id": "pagination",
+    "title": "Pagination",
+    "width": 480,
+    "height": 90,
+    "difficulty": "easy"
+  },
+  {
+    "id": "empty-state",
+    "title": "Empty state with icon",
+    "width": 480,
+    "height": 320,
+    "difficulty": "easy"
+  },
+  {
+    "id": "footer",
+    "title": "Dark site footer",
+    "width": 900,
+    "height": 220,
+    "difficulty": "medium"
+  },
+  {
+    "id": "settings-toggles",
+    "title": "Settings with toggles",
+    "width": 460,
+    "height": 280,
+    "difficulty": "medium"
+  },
+  {
+    "id": "chat-bubbles",
+    "title": "Chat bubbles",
+    "width": 420,
+    "height": 300,
+    "difficulty": "medium"
+  },
+  {
+    "id": "progress-card",
+    "title": "Storage progress card",
+    "width": 400,
+    "height": 220,
+    "difficulty": "easy"
+  },
+  {
+    "id": "testimonial",
+    "title": "Testimonial",
+    "width": 560,
+    "height": 260,
+    "difficulty": "medium"
+  },
+  {
+    "id": "timeline",
+    "title": "Order timeline",
+    "width": 440,
+    "height": 320,
+    "difficulty": "hard"
+  }
+]
