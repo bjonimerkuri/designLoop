@@ -1,0 +1,23 @@
+{
+  "name": "@designloop/evals",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "fixtures": "tsx src/make-fixtures.ts",
+    "run": "tsx src/cli.ts",
+    "test": "node --import tsx --test src/report.test.ts",
+    "compare": "tsx src/compare.ts"
+  },
+  "dependencies": {
+    "@designloop/agent-core": "*",
+    "@designloop/shared": "*",
+    "@prisma/client": "^6.0.0",
+    "dotenv": "^16.4.0",
+    "playwright": "1.49.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
