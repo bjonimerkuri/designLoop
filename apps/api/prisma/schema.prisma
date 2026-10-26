@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Run {
+  id              String    @id @default(cuid())
+  status          String    @default("queued")
+  framework       String    @default("react")
+  parentId        String?
+  instruction     String?
+  review          String?
+  baseTsx         String?
+  baseCss         String?
+  hint            String?
+  model           String
+  width           Int
+  height          Int
+  promptVersion   String
+  tsx             String?
+  css             String?
+  error           String?
+  stopReason      String?
+  similarity      Float?
+  a11yBlocking    Int?
+  compiled        Boolean?
+  iterations      Int?
+  bestIteration   Int?
+  totalCost       Float?
+  totalDurationMs Int?
+  createdAt       DateTime  @default(now())
+  finishedAt      DateTime?
+  steps           Step[]
+}
+
+model Step {
+  id         String   @id @default(cuid())
+  runId      String
+  run        Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  index      Int
+  type       String
+  name       String
+  summary    String
+  iteration  Int?
+  data       Json?
+  tokensIn   Int      @default(0)
+  tokensOut  Int      @default(0)
+  cost       Float    @default(0)
+  durationMs Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@unique([runId, index])
+}
+
+model EvalRun {
+  id            String       @id @default(cuid())
+  createdAt     DateTime     @default(now())
+  date          String
+  model         String
+  promptVersion String
+  commit        String
+  meta          Json
+  summaries     Json
+  results       EvalResult[]
+}
+
+model EvalResult {
+  id            String   @id @default(cuid())
+  evalRunId     String
+  evalRun       EvalRun  @relation(fields: [evalRunId], references: [id], onDelete: Cascade)
+  fixtureId     String
+  framework     String
+  repeat        Int
+  status        String
+  stopReason    String?
+  passed        Boolean
+  similarity    Float
+  a11yBlocking  Int
+  compiled      Boolean
+  consoleErrors Int
+  typeErrors    Int
+  iterations    Int
+  cost          Float
+  durationMs    Int
+  category      String?
+  error         String?
+
+  @@index([evalRunId])
+}
