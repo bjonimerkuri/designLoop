@@ -6,7 +6,12 @@ import type { AgentConfig, AgentInput, LlmClient, LlmRequest, LlmResponse, Rende
 
 function solid(width: number, height: number, value: number): Buffer {
   const png = new PNG({ width, height });
-  png.data.fill(value);
+  for (let i = 0; i < png.data.length; i += 4) {
+    png.data[i] = value;
+    png.data[i + 1] = value;
+    png.data[i + 2] = value;
+    png.data[i + 3] = 255; // fully opaque: pixelmatch blends transparent pixels onto white
+  }
   return PNG.sync.write(png);
 }
 
