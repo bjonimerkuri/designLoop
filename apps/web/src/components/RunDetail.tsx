@@ -56,7 +56,7 @@ export function RunDetail({
           {run.instruction ? <p className="muted">Requested change: “{run.instruction}”</p> : null}
           {run.parentId ? (
             <p className="small">
-              <Link href={`/runs/${run.parentId}`}>See the run this one revises</Link>
+              <Link href={`/run?id=${run.parentId}`}>See the run this one revises</Link>
             </p>
           ) : null}
         </div>

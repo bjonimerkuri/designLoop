@@ -11,7 +11,20 @@ export async function initErrorReporting(): Promise<Reporter | null> {
   const dsn = process.env.SENTRY_DSN;
   if (!dsn) return null;
   const Sentry = await import('@sentry/node');
-  Sentry.init({ dsn, environment: process.env.NODE_ENV ?? 'development', tracesSampleRate: 0 });
+  Sentry.init({
+    dsn,
+    environment: process.env.NODE_ENV ?? 'development',
+    tracesSampleRate: 0,
+    sendDefaultPii: false,
+    beforeSend(event) {
+      if (event.request) {
+        delete event.request.headers;
+        delete event.request.data;
+        delete event.request.cookies;
+      }
+      return event;
+    }
+  });
   reporter = (error) => {
     Sentry.captureException(error);
   };

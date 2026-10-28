@@ -15,20 +15,24 @@ import {
 import {
   PROMPT_VERSION,
   createLlmClient,
+  createUserLlmClient,
   loadAgentConfig,
   readImageSize,
   runAgent,
   sanitizeImage
 } from '@designloop/agent-core';
+import type { UserLlmConfig } from '@designloop/agent-core';
 import { FRAMEWORKS, TERMINAL_STATUSES } from '@designloop/shared';
-import type { Framework, RunPage, RunStatus, RunView, StreamEvent } from '@designloop/shared';
+import type { AppConfig, Framework, RunPage, RunStatus, RunView, StreamEvent } from '@designloop/shared';
 import { Prisma } from '@prisma/client';
 import { Observable, Subject, Subscription } from 'rxjs';
 import { STORAGE_DIR } from './config';
 import { reportError } from './error-reporting';
+import { KeyVault } from './key-vault';
 import { toRunView, toStepView } from './mappers';
 import { PrismaService } from './prisma.service';
 import { createQueue } from './queue';
+import { redactSecrets } from './user-llm';
 
 const ID_PATTERN = /^[a-z0-9]{10,40}$/;
 const FILE_PATTERN = /^(design|render-\d{1,2}|diff-\d{1,2})\.png$/;
@@ -45,6 +49,7 @@ export class RunsService implements OnApplicationBootstrap, OnApplicationShutdow
   private readonly hits = new Map<string, number[]>();
   private readonly workerEnabled = process.env.WORKER_ENABLED !== 'false';
   private readonly queue = createQueue();
+  private readonly vault = new KeyVault();
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -57,6 +62,17 @@ export class RunsService implements OnApplicationBootstrap, OnApplicationShutdow
     });
     for (const run of stale) {
       await this.prisma.step.deleteMany({ where: { runId: run.id } });
+      if (!run.usesServerKey) {
+        await this.prisma.run.update({
+          where: { id: run.id },
+          data: {
+            status: 'error',
+            error: 'The server restarted and your API key is not kept, so this run could not continue. Start it again.',
+            finishedAt: new Date()
+          }
+        });
+        continue;
+      }
       await this.prisma.run.update({ where: { id: run.id }, data: { status: 'queued' } });
       this.enqueue(run.id);
     }
@@ -89,7 +105,7 @@ export class RunsService implements OnApplicationBootstrap, OnApplicationShutdow
       start.setUTCHours(0, 0, 0, 0);
       const total = await this.prisma.run.aggregate({
         _sum: { totalCost: true },
-        where: { createdAt: { gte: start } }
+        where: { createdAt: { gte: start }, usesServerKey: true }
       });
       if ((total._sum.totalCost ?? 0) >= cap) {
         throw new HttpException(
@@ -100,15 +116,52 @@ export class RunsService implements OnApplicationBootstrap, OnApplicationShutdow
     }
   }
 
-  private model(): string {
+  private serverKeyAvailable(): boolean {
+    if (process.env.ALLOW_SERVER_KEY === 'false') return false;
+    if (process.env.ALLOW_SERVER_KEY === undefined && process.env.DEMO_MODE === 'true') return false;
     try {
-      return createLlmClient().model;
-    } catch (error) {
-      throw new ServiceUnavailableException((error as Error).message);
+      createLlmClient();
+      return true;
+    } catch {
+      return false;
     }
   }
 
-  async create(design: Buffer, hint: string, framework: Framework, ip: string): Promise<RunView> {
+  publicConfig(): AppConfig {
+    return {
+      serverKeyAvailable: this.serverKeyAvailable(),
+      personalKeysEnabled: process.env.PERSONAL_KEYS !== 'false' && process.env.QUEUE !== 'pgboss',
+      demoMode: process.env.DEMO_MODE === 'true'
+    };
+  }
+
+  private resolveLlm(user: UserLlmConfig | null): { model: string; usesServerKey: boolean } {
+    if (user) {
+      if (process.env.PERSONAL_KEYS === 'false') {
+        throw new BadRequestException('Personal API keys are turned off on this server.');
+      }
+      if (process.env.QUEUE === 'pgboss') {
+        throw new BadRequestException('Personal API keys need the in-process queue (QUEUE=memory).');
+      }
+      return { model: user.model, usesServerKey: false };
+    }
+    if (!this.serverKeyAvailable()) {
+      throw new BadRequestException('Add your API key in Settings to run the agent.');
+    }
+    try {
+      return { model: createLlmClient().model, usesServerKey: true };
+    } catch (error) {
+      throw new ServiceUnavailableException(redactSecrets((error as Error).message));
+    }
+  }
+
+  async create(
+    design: Buffer,
+    hint: string,
+    framework: Framework,
+    ip: string,
+    user: UserLlmConfig | null = null
+  ): Promise<RunView> {
     const header = readImageSize(design);
     if (!header) throw new BadRequestException('Only PNG or JPEG images are supported.');
     if (header.width < 200 || header.width > 1600 || header.height < 100 || header.height > 2000) {
@@ -124,15 +177,16 @@ export class RunsService implements OnApplicationBootstrap, OnApplicationShutdow
     if (!size || size.width !== header.width || size.height !== header.height) {
       throw new BadRequestException('The image header does not match its content.');
     }
-    await this.guard(ip);
-    const model = this.model();
+    const llm = this.resolveLlm(user);
+    if (llm.usesServerKey) await this.guard(ip);
 
     const run = await this.prisma.run.create({
       data: {
         status: 'queued',
         framework,
+        usesServerKey: llm.usesServerKey,
         hint: hint || null,
-        model,
+        model: llm.model,
         width: size.width,
         height: size.height,
         promptVersion: PROMPT_VERSION
@@ -140,31 +194,45 @@ export class RunsService implements OnApplicationBootstrap, OnApplicationShutdow
     });
     await mkdir(join(STORAGE_DIR, run.id), { recursive: true });
     await writeFile(join(STORAGE_DIR, run.id, 'design.png'), clean);
-    this.log('run_created', { runId: run.id, framework, model, width: size.width, height: size.height });
+    if (user) this.vault.put(run.id, user);
+    this.log('run_created', {
+      runId: run.id,
+      framework,
+      model: llm.model,
+      personalKey: !llm.usesServerKey,
+      width: size.width,
+      height: size.height
+    });
     this.enqueue(run.id);
     return toRunView(run);
   }
 
-  async revise(parentId: string, instruction: string, ip: string): Promise<RunView> {
+  async revise(
+    parentId: string,
+    instruction: string,
+    ip: string,
+    user: UserLlmConfig | null = null
+  ): Promise<RunView> {
     if (!instruction) throw new BadRequestException('Describe what should change.');
     const parent = await this.prisma.run.findUnique({ where: { id: parentId } });
     if (!parent) throw new NotFoundException('Run not found');
     if (!TERMINAL_STATUSES.includes(parent.status as RunStatus) || !parent.tsx) {
       throw new BadRequestException('Wait for the run to finish before asking for a change.');
     }
-    await this.guard(ip);
-    const model = this.model();
+    const llm = this.resolveLlm(user);
+    if (llm.usesServerKey) await this.guard(ip);
 
     const run = await this.prisma.run.create({
       data: {
         status: 'queued',
         framework: parent.framework,
+        usesServerKey: llm.usesServerKey,
         parentId: parent.id,
         instruction,
         baseTsx: parent.tsx,
         baseCss: parent.css,
         hint: parent.hint,
-        model,
+        model: llm.model,
         width: parent.width,
         height: parent.height,
         promptVersion: PROMPT_VERSION
@@ -172,7 +240,14 @@ export class RunsService implements OnApplicationBootstrap, OnApplicationShutdow
     });
     await mkdir(join(STORAGE_DIR, run.id), { recursive: true });
     await copyFile(join(STORAGE_DIR, parent.id, 'design.png'), join(STORAGE_DIR, run.id, 'design.png'));
-    this.log('run_created', { runId: run.id, parentId: parent.id, framework: parent.framework, model });
+    if (user) this.vault.put(run.id, user);
+    this.log('run_created', {
+      runId: run.id,
+      parentId: parent.id,
+      framework: parent.framework,
+      model: llm.model,
+      personalKey: !llm.usesServerKey
+    });
     this.enqueue(run.id);
     return toRunView(run);
   }
@@ -283,13 +358,19 @@ export class RunsService implements OnApplicationBootstrap, OnApplicationShutdow
 
   private async process(id: string) {
     const subject = this.subject(id);
+    let secret: string | undefined;
     try {
       const run = await this.prisma.run.findUniqueOrThrow({ where: { id } });
       await this.prisma.step.deleteMany({ where: { runId: id } });
       await this.prisma.run.update({ where: { id }, data: { status: 'running' } });
       this.log('run_started', { runId: id, framework: run.framework, model: run.model });
 
-      const llm = createLlmClient();
+      const personal = run.usesServerKey ? null : this.vault.take(id);
+      if (!run.usesServerKey && !personal) {
+        throw new Error('Your API key is no longer available, so this run could not start. Start it again.');
+      }
+      secret = personal?.apiKey;
+      const llm = personal ? createUserLlmClient(personal) : createLlmClient();
       const config = loadAgentConfig();
       const designPng = await readFile(join(STORAGE_DIR, id, 'design.png'));
 
@@ -366,14 +447,15 @@ export class RunsService implements OnApplicationBootstrap, OnApplicationShutdow
       });
       subject.next({ type: 'done', status: result.status });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = redactSecrets(error instanceof Error ? error.message : 'Unknown error', secret);
       this.logger.error(JSON.stringify({ event: 'run_failed', runId: id, message }));
-      reportError(error);
+      reportError(new Error(message));
       await this.prisma.run
         .update({ where: { id }, data: { status: 'error', error: message, finishedAt: new Date() } })
         .catch(() => undefined);
       subject.next({ type: 'done', status: 'error' });
     } finally {
+      this.vault.drop(id);
       subject.complete();
       this.subjects.delete(id);
     }

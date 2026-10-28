@@ -1,4 +1,5 @@
 import type {
+  AppConfig,
   EvalHistoryPoint,
   EvalReportFile,
   Framework,
@@ -7,8 +8,18 @@ import type {
   RunPage,
   RunView
 } from '@designloop/shared';
+import { headersFor, llmHeaders } from './keystore';
+import type { StoredKey } from './keystore';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+export const STATIC_DEMO = process.env.NEXT_PUBLIC_STATIC_DEMO === 'true';
+
+async function staticJson<T>(path: string): Promise<T> {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error('This data is not available in the static demo.');
+  return res.json();
+}
 
 export const fileUrl = (id: string, name: string) => `${API_URL}/runs/${id}/files/${name}`;
 
@@ -39,9 +50,13 @@ export function listRuns(params: { cursor?: string | null; framework?: string; s
 
 export const getRun = (id: string) => getJson<RunView>(`/runs/${id}`);
 
-export const listEvals = () => getJson<Pick<EvalReportFile, 'name' | 'meta' | 'summaries'>[]>('/evals');
+export const listEvals = () =>
+  STATIC_DEMO
+    ? staticJson<Pick<EvalReportFile, 'name' | 'meta' | 'summaries'>[]>('/data/evals/index.json')
+    : getJson<Pick<EvalReportFile, 'name' | 'meta' | 'summaries'>[]>('/evals');
 
-export const getEvalHistory = () => getJson<EvalHistoryPoint[]>('/evals/history');
+export const getEvalHistory = () =>
+  STATIC_DEMO ? Promise.resolve<EvalHistoryPoint[]>([]) : getJson<EvalHistoryPoint[]>('/evals/history');
 
 export async function getMetrics(token: string): Promise<MetricsView> {
   const res = await fetch(`${API_URL}/metrics`, {
@@ -62,14 +77,17 @@ export async function reviewRun(id: string, decision: ReviewDecision): Promise<R
   return res.json();
 }
 
-export const getEval = (name: string) => getJson<EvalReportFile>(`/evals/${encodeURIComponent(name)}`);
+export const getEval = (name: string) =>
+  STATIC_DEMO
+    ? staticJson<EvalReportFile>(`/data/evals/${encodeURIComponent(name)}`)
+    : getJson<EvalReportFile>(`/evals/${encodeURIComponent(name)}`);
 
 export async function createRun(file: File, hint: string, framework: Framework): Promise<RunView> {
   const form = new FormData();
   form.append('design', file);
   form.append('hint', hint);
   form.append('framework', framework);
-  const res = await fetch(`${API_URL}/runs`, { method: 'POST', body: form });
+  const res = await fetch(`${API_URL}/runs`, { method: 'POST', body: form, headers: llmHeaders() });
   if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }
@@ -77,9 +95,17 @@ export async function createRun(file: File, hint: string, framework: Framework):
 export async function reviseRun(id: string, instruction: string): Promise<RunView> {
   const res = await fetch(`${API_URL}/runs/${id}/revisions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...llmHeaders() },
     body: JSON.stringify({ instruction })
   });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export const getConfig = () => getJson<AppConfig>('/config');
+
+export async function testKey(key: StoredKey): Promise<{ ok: boolean; message?: string; model?: string }> {
+  const res = await fetch(`${API_URL}/llm/test`, { method: 'POST', headers: headersFor(key) });
   if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }

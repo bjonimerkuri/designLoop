@@ -32,7 +32,7 @@ export default function DemoIndex() {
       <ul className="demo-list">
         {demos?.map((demo) => (
           <li key={demo.slug}>
-            <Link href={`/demo/${demo.slug}`}>{demo.title}</Link>
+            <Link href={`/demo/view?slug=${demo.slug}`}>{demo.title}</Link>
             <span className="muted small">
               {frameworkLabel(demo.framework)}, {pct(demo.similarity)} similar
             </span>

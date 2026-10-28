@@ -14,6 +14,7 @@ model Run {
   parentId        String?
   instruction     String?
   review          String?
+  usesServerKey   Boolean   @default(true)
   baseTsx         String?
   baseCss         String?
   hint            String?

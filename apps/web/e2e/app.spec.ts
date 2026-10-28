@@ -73,7 +73,7 @@ test('the home page offers the three outputs', async ({ page }) => {
 test('a saved run replays step by step and ends with the code', async ({ page }) => {
   await page.route('**/demo/e2e-sample/run.json', (route) => route.fulfill({ json: run }));
   await page.route('**/demo/e2e-sample/*.png', (route) => route.fulfill({ body: pixel, contentType: 'image/png' }));
-  await page.goto('/demo/e2e-sample');
+  await page.goto('/demo/view?slug=e2e-sample');
   await expect(page.getByText('Measured the colors')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Component code' })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Passed', { exact: true })).toBeVisible();

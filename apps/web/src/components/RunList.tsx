@@ -122,7 +122,7 @@ export function RunList() {
             {runs.map((run) => (
               <tr key={run.id}>
                 <td>
-                  <Link href={`/runs/${run.id}`}>{new Date(run.createdAt).toLocaleString()}</Link>
+                  <Link href={`/run?id=${run.id}`}>{new Date(run.createdAt).toLocaleString()}</Link>
                   <span className="muted small">
                     {run.width}×{run.height}, {frameworkLabel(run.framework)}, {run.model}
                   </span>

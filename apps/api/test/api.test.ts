@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { after, before, test } from 'node:test';
+import { after, before, mock, test } from 'node:test';
 import type { INestApplication } from '@nestjs/common';
 import { encode } from 'jpeg-js';
 import { PNG } from 'pngjs';
@@ -97,6 +97,8 @@ before(async () => {
     .useValue(fakePrisma)
     .compile();
   app = moduleRef.createNestApplication();
+  const { securityHeaders } = await import('../src/security');
+  app.use(securityHeaders);
   await app.init();
 });
 
@@ -232,6 +234,7 @@ test('revisions need an instruction and a finished run', async () => {
 
 test('demo mode limits runs per hour', async () => {
   process.env.DEMO_MODE = 'true';
+  process.env.ALLOW_SERVER_KEY = 'true';
   process.env.RATE_LIMIT_PER_HOUR = '2';
   try {
     const upload = () =>
@@ -296,4 +299,102 @@ test('eval reports are listed and read from disk', async () => {
   assert.equal(detail.body.meta.model, 'm');
   await request(server()).get('/evals/missing.json').expect(404);
   await request(server()).get('/evals/..%2Fpackage.json').expect(404);
+});
+
+const PERSONAL = {
+  'x-llm-provider': 'anthropic',
+  'x-llm-api-key': 'sk-ant-personal-secret-123456',
+  'x-llm-model': 'claude-sonnet-5-5'
+};
+
+const upload = () =>
+  request(server()).post('/runs').attach('design', png(300, 200), { filename: 'd.png', contentType: 'image/png' });
+
+test('the config endpoint says whether a server key exists', async () => {
+  const res = await request(server()).get('/config').expect(200);
+  assert.deepEqual(res.body, { serverKeyAvailable: true, personalKeysEnabled: true, demoMode: false });
+});
+
+test('a personal key creates a run and is never stored or returned', async () => {
+  const res = await upload().set(PERSONAL).expect(201);
+  assert.equal(res.body.model, 'claude-sonnet-5-5');
+  assert.ok(!JSON.stringify(res.body).includes('personal-secret'));
+  assert.ok(!JSON.stringify([...runs.values()]).includes('personal-secret'));
+  assert.equal(runs.get(res.body.id)?.usesServerKey, false);
+});
+
+test('invalid personal key settings are rejected without echoing the key', async () => {
+  const cases: [Record<string, string>, RegExp][] = [
+    [{ ...PERSONAL, 'x-llm-provider': 'other' }, /provider/],
+    [{ ...PERSONAL, 'x-llm-api-key': 'short' }, /API key/],
+    [{ ...PERSONAL, 'x-llm-model': 'bad model' }, /model/],
+    [{ 'x-llm-provider': 'openai', 'x-llm-model': 'gpt-4o' }, /key/],
+    [{ ...PERSONAL, 'x-llm-price-in': '-1' }, /price/]
+  ];
+  for (const [headers, pattern] of cases) {
+    const res = await upload().set(headers).expect(400);
+    assert.match(res.body.message, pattern);
+    assert.ok(!JSON.stringify(res.body).includes('personal-secret'));
+  }
+});
+
+test('without a server key and without a personal key the run is refused', async () => {
+  process.env.ALLOW_SERVER_KEY = 'false';
+  try {
+    const refused = await upload().expect(400);
+    assert.match(refused.body.message, /API key/);
+    const config = await request(server()).get('/config').expect(200);
+    assert.equal(config.body.serverKeyAvailable, false);
+    await upload().set(PERSONAL).expect(201);
+  } finally {
+    delete process.env.ALLOW_SERVER_KEY;
+  }
+});
+
+test('personal keys are not counted against the demo limits', async () => {
+  process.env.DEMO_MODE = 'true';
+  process.env.RATE_LIMIT_PER_HOUR = '1';
+  try {
+    for (let i = 0; i < 3; i++) await upload().set(PERSONAL).expect(201);
+  } finally {
+    delete process.env.DEMO_MODE;
+    delete process.env.RATE_LIMIT_PER_HOUR;
+  }
+});
+
+test('personal keys can be turned off', async () => {
+  process.env.PERSONAL_KEYS = 'false';
+  try {
+    const res = await upload().set(PERSONAL).expect(400);
+    assert.match(res.body.message, /turned off/);
+  } finally {
+    delete process.env.PERSONAL_KEYS;
+  }
+});
+
+test('the key check reports success and hides the key in error messages', async () => {
+  let calls = 0;
+  mock.method(globalThis, 'fetch', async () =>
+    calls++ === 0
+      ? new Response(JSON.stringify({ content: [{ type: 'text', text: 'OK' }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 })
+      : new Response(JSON.stringify({ error: { message: 'invalid x-api-key sk-ant-personal-secret-123456' } }), { status: 401 })
+  );
+  try {
+    const good = await request(server()).post('/llm/test').set(PERSONAL).expect(201);
+    assert.equal(good.body.ok, true);
+    const bad = await request(server()).post('/llm/test').set(PERSONAL).expect(201);
+    assert.equal(bad.body.ok, false);
+    assert.match(bad.body.message, /401/);
+    assert.ok(!bad.body.message.includes('personal-secret'));
+  } finally {
+    mock.restoreAll();
+  }
+  await request(server()).post('/llm/test').expect(400);
+});
+
+test('every response carries the security headers', async () => {
+  const res = await request(server()).get('/health').expect(200);
+  assert.equal(res.headers['x-content-type-options'], 'nosniff');
+  assert.equal(res.headers['referrer-policy'], 'no-referrer');
+  assert.equal(res.headers['x-frame-options'], 'DENY');
 });

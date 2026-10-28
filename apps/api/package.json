@@ -9,7 +9,7 @@
     "prisma:generate": "dotenv -e ../../.env -- prisma generate",
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "demo:export": "node dist/scripts/export-demo.js",
-    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/api.test.js",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
     "prisma:push": "dotenv -e ../../.env -- prisma db push"
   },
   "dependencies": {

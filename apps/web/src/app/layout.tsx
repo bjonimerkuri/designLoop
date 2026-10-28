@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { STATIC_DEMO } from '@/lib/api';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -27,10 +28,21 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </Link>
           <p>Design in, component out, checked until it matches.</p>
           <nav className="nav" aria-label="Main">
-            <Link href="/">Runs</Link>
-            <Link href="/evals">Evals</Link>
-            <Link href="/demo">Saved runs</Link>
-            <Link href="/status">Status</Link>
+            {STATIC_DEMO ? (
+              <>
+                <Link href="/">About</Link>
+                <Link href="/demo">Saved runs</Link>
+                <Link href="/evals">Evals</Link>
+              </>
+            ) : (
+              <>
+                <Link href="/">Runs</Link>
+                <Link href="/evals">Evals</Link>
+                <Link href="/demo">Saved runs</Link>
+                <Link href="/settings">API key</Link>
+                <Link href="/status">Status</Link>
+              </>
+            )}
           </nav>
           <ThemeToggle />
         </header>

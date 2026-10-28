@@ -6,7 +6,11 @@ import type { FormEvent } from 'react';
 import { FRAMEWORKS } from '@designloop/shared';
 import type { Framework } from '@designloop/shared';
 import { frameworkLabel } from '@/lib/format';
-import { createRun } from '@/lib/api';
+import Link from 'next/link';
+import type { AppConfig } from '@designloop/shared';
+import { createRun, getConfig } from '@/lib/api';
+import { loadKey, maskKey } from '@/lib/keystore';
+import type { StoredKey } from '@/lib/keystore';
 
 export function UploadForm() {
   const router = useRouter();
@@ -18,6 +22,17 @@ export function UploadForm() {
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [key, setKey] = useState<StoredKey | null>(null);
+
+  useEffect(() => {
+    setKey(loadKey());
+    getConfig()
+      .then(setConfig)
+      .catch(() => setConfig(null));
+  }, []);
+
+  const needsKey = config !== null && !config.serverKeyAvailable && key === null;
 
   useEffect(() => {
     if (!file) {
@@ -45,11 +60,15 @@ export function UploadForm() {
       setError('Choose a design to start.');
       return;
     }
+    if (needsKey) {
+      setError('Add your API key in Settings first.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const run = await createRun(file, hint.trim(), framework);
-      router.push(`/runs/${run.id}`);
+      router.push(`/run?id=${run.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The upload failed.');
       setBusy(false);
@@ -117,10 +136,25 @@ export function UploadForm() {
           onChange={(event) => setHint(event.target.value)}
         />
       </label>
+      <p className="muted small" aria-live="polite">
+        {key ? (
+          <>
+            Using your {key.provider} key ({maskKey(key.apiKey)}) with {key.model}. <Link href="/settings">Change</Link>
+          </>
+        ) : needsKey ? (
+          <>
+            This server has no API key. <Link href="/settings">Add your own key</Link> to run the agent.
+          </>
+        ) : (
+          <>
+            Using the server's key. <Link href="/settings">Use your own key instead</Link>
+          </>
+        )}
+      </p>
       <p className="error" role="alert" aria-live="polite">
         {error}
       </p>
-      <button className="button" type="submit" disabled={busy}>
+      <button className="button" type="submit" disabled={busy || needsKey}>
         {busy ? 'Starting run' : 'Build component'}
       </button>
     </form>

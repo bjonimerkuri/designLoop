@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   MessageEvent,
   NotFoundException,
   Param,
@@ -19,7 +20,20 @@ import { FRAMEWORKS } from '@designloop/shared';
 import type { Framework } from '@designloop/shared';
 import type { Request, Response } from 'express';
 import { Observable, map } from 'rxjs';
+import type { UserLlmConfig } from '@designloop/agent-core';
 import { RunsService } from './runs.service';
+import { LlmConfigError, parseUserLlm } from './user-llm';
+
+type HeaderBag = Record<string, string | string[] | undefined>;
+
+function personalLlm(headers: HeaderBag): UserLlmConfig | null {
+  try {
+    return parseUserLlm(headers);
+  } catch (error) {
+    if (error instanceof LlmConfigError) throw new BadRequestException(error.message);
+    throw error;
+  }
+}
 
 @Controller('runs')
 export class RunsController {
@@ -31,6 +45,7 @@ export class RunsController {
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body('hint') hint: string | undefined,
     @Body('framework') framework: string | undefined,
+    @Headers() headers: HeaderBag,
     @Req() req: Request
   ) {
     if (!file) throw new BadRequestException('Attach a PNG or JPEG design in the "design" field.');
@@ -38,7 +53,7 @@ export class RunsController {
     if (framework !== undefined && !chosen) {
       throw new BadRequestException(`The framework must be one of: ${FRAMEWORKS.join(', ')}.`);
     }
-    return this.runs.create(file.buffer, (hint ?? '').trim().slice(0, 500), chosen ?? 'react', req.ip ?? 'unknown');
+    return this.runs.create(file.buffer, (hint ?? '').trim().slice(0, 500), chosen ?? 'react', req.ip ?? 'unknown', personalLlm(headers));
   }
 
   @Get()
@@ -64,8 +79,13 @@ export class RunsController {
   }
 
   @Post(':id/revisions')
-  revise(@Param('id') id: string, @Body('instruction') instruction: string | undefined, @Req() req: Request) {
-    return this.runs.revise(id, (instruction ?? '').trim().slice(0, 500), req.ip ?? 'unknown');
+  revise(
+    @Param('id') id: string,
+    @Body('instruction') instruction: string | undefined,
+    @Headers() headers: HeaderBag,
+    @Req() req: Request
+  ) {
+    return this.runs.revise(id, (instruction ?? '').trim().slice(0, 500), req.ip ?? 'unknown', personalLlm(headers));
   }
 
   @Post(':id/review')

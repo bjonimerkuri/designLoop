@@ -21,7 +21,7 @@ export function RevisionForm({ runId }: { runId: string }) {
     setError(null);
     try {
       const run = await reviseRun(runId, instruction.trim());
-      router.push(`/runs/${run.id}`);
+      router.push(`/run?id=${run.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The request failed.');
       setBusy(false);
