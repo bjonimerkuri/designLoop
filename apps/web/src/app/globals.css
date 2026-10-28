@@ -807,3 +807,12 @@ select {
 .plain-list li {
   margin-bottom: 0.4rem;
 }
+
+.static-home {
+  display: grid;
+  gap: 2rem;
+}
+
+.static-home p {
+  max-width: 62ch;
+}
