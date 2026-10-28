@@ -40,7 +40,7 @@ flowchart LR
   Worker --> Files[(render and diff images)]
   API -->|server-sent events| UI
   Evals[eval CLI] --> Agent
-  Evals --> Reports[(evals/results, docs/evals.md, database)]
+  Evals --> Reports[(evals/results, database)]
   API --> Reports
 ```
 
@@ -188,7 +188,7 @@ npm run eval -- --framework all --repeats 2 --save-db
 npm run eval:compare -- <report-a.json> <report-b.json>
 ```
 
-The 25 fixtures are designs written as HTML in `fixtures/html`, from a stat card to a data table and a timeline, plus one that contains an instruction aimed at the model. The CLI runs the agent on each design for each target, saves raw results to `evals/results`, rewrites [docs/evals.md](docs/evals.md), and powers the Evals page. Options: `--framework react|react-tailwind|angular|both|all`, `--limit N`, `--only id1,id2`, `--repeats N`, `--model NAME`, `--save-db`, `--baseline FILE --max-regression 0.1`, `--min-pass-rate 0.6`.
+The 25 fixtures are designs written as HTML in `fixtures/html`, from a stat card to a data table and a timeline, plus one that contains an instruction aimed at the model. The CLI runs the agent on each design for each target, saves raw results to `evals/results`, rewrites , and powers the Evals page. Options: `--framework react|react-tailwind|angular|both|all`, `--limit N`, `--only id1,id2`, `--repeats N`, `--model NAME`, `--save-db`, `--baseline FILE --max-regression 0.1`, `--min-pass-rate 0.6`.
 
 Reported per target: pass rate, mean and median similarity, passes per run and per success, cost per run and per success, p50 and p95 time, and failures by category (visual mismatch, compile error, type error, runtime error, accessibility, budget, agent error). Failures are kept in the report.
 
@@ -225,7 +225,7 @@ The web app can be built as a static copy that needs no server, no database and 
 
 To deploy from GitHub, add the repository secrets `CLOUDFLARE_API_TOKEN` (a token with the Pages edit permission) and `CLOUDFLARE_ACCOUNT_ID`, and the repository variable `CLOUDFLARE_PAGES_PROJECT` with the project name. The `deploy-demo` workflow then builds and publishes on every push to `main` that touches the web app. To use the Cloudflare dashboard instead, connect the repository and set the build command to `npm install && npm run build:packages && npm run build:static`, the output directory to `apps/web/out`, and the variable `NODE_VERSION` to `22`.
 
-The static build uses links such as `/demo/view?slug=...` so every page can be plain files, and `apps/web/public/_headers` sets the security headers on Cloudflare Pages. Publishing the repository safely is covered in [docs/publishing.md](docs/publishing.md).
+The static build uses links such as `/demo/view?slug=...` so every page can be plain files, and `apps/web/public/_headers` sets the security headers on Cloudflare Pages. 
 
 ## Using a free or local model
 
@@ -307,12 +307,9 @@ packages/evals       fixture renderer, eval CLI, reports, comparison, regression
 apps/api             NestJS API, Prisma schema, queue, event stream, tests
 apps/web             Next.js interface, component and end-to-end tests
 fixtures             manifest and HTML sources of the eval designs
-docs                 spec, architecture, decision records, generated reports
 ```
 
-## Design decisions
 
-Short records with context and consequences are in [docs/decisions](docs/decisions): no agent framework, esbuild and browser JIT for verification, multi-signal pass criteria, run state in PostgreSQL with a pluggable queue, file-based evals, plain CSS with a Tailwind target, npm workspaces instead of Nx, and the Docker sandbox.
 
 ## Limitations
 
