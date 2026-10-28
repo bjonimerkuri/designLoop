@@ -138,3 +138,43 @@ export interface RunPage {
   items: RunView[];
   nextCursor: string | null;
 }
+
+export type LlmProviderId = 'anthropic' | 'openai' | 'gemini';
+
+export interface LlmProviderInfo {
+  id: LlmProviderId;
+  label: string;
+  defaultModel: string;
+  models: string[];
+  keyHint: string;
+}
+
+export const LLM_PROVIDERS: LlmProviderInfo[] = [
+  {
+    id: 'anthropic',
+    label: 'Anthropic (Claude)',
+    defaultModel: 'claude-sonnet-5-5',
+    models: ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5'],
+    keyHint: 'Keys start with sk-ant-'
+  },
+  {
+    id: 'openai',
+    label: 'OpenAI',
+    defaultModel: 'gpt-4o',
+    models: ['gpt-4o', 'gpt-4o-mini'],
+    keyHint: 'Keys start with sk-'
+  },
+  {
+    id: 'gemini',
+    label: 'Google Gemini',
+    defaultModel: 'gemini-2.5-flash',
+    models: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'gemini-flash-lite-latest'],
+    keyHint: 'Keys start with AIza'
+  }
+];
+
+export interface AppConfig {
+  serverKeyAvailable: boolean;
+  personalKeysEnabled: boolean;
+  demoMode: boolean;
+}

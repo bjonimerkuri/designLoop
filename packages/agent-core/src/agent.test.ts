@@ -17,6 +17,7 @@ const baseConfig: AgentConfig = {
   maxIterations: 5,
   maxCostUsd: 10,
   maxSeconds: 60,
+  maxTokens: 1000000,
   similarityThreshold: 0.9,
   a11yMaxBlocking: 0
 };
@@ -185,4 +186,17 @@ test('the react-tailwind and angular prompts ask for a single code block', async
     const system = llm.calls[llm.calls.length - 1].system;
     assert.match(system, /exactly one fenced/);
   }
+});
+
+test('stops when the token budget is reached, whatever the prices are', async () => {
+  const result = await runAgent(
+    input,
+    fakeLlm(0),
+    { ...baseConfig, maxTokens: 30 },
+    () => undefined,
+    fakeRenderer([bad])
+  );
+  assert.equal(result.status, 'budget_exceeded');
+  assert.equal(result.stopReason, 'budget_tokens');
+  assert.equal(result.metrics.iterations, 1);
 });

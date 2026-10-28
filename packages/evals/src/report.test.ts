@@ -56,6 +56,7 @@ test('categorize assigns a failure category', () => {
   assert.equal(categorize({ ...rest, passed: false, consoleErrors: 1 }, 0.9), 'runtime_error');
   assert.equal(categorize({ ...rest, passed: false, typeErrors: 2 }, 0.9), 'type_error');
   assert.equal(categorize({ ...rest, passed: false, stopReason: 'budget_cost' }, 0.9), 'budget');
+  assert.equal(categorize({ ...rest, passed: false, stopReason: 'budget_tokens' }, 0.9), 'budget');
   assert.equal(categorize({ ...rest, passed: false, a11yBlocking: 3 }, 0.9), 'accessibility');
   assert.equal(categorize({ ...rest, passed: false, similarity: 0.5 }, 0.9), 'visual_mismatch');
 });

@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test src/code.test.ts src/llm.test.ts src/typecheck.test.ts src/tokens.test.ts src/tools.test.ts src/agent.test.ts"
+    "test": "node --import tsx --test src/code.test.ts src/llm.test.ts src/user-llm.test.ts src/typecheck.test.ts src/tokens.test.ts src/tools.test.ts src/agent.test.ts"
   },
   "dependencies": {
     "@angular/common": "^20.2.0",

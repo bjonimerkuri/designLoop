@@ -26,6 +26,8 @@ const { values } = parseArgs({
     repeats: { type: 'string', default: '1' },
     model: { type: 'string' },
     'save-db': { type: 'boolean', default: false },
+    'save-artifacts': { type: 'boolean', default: false },
+    publish: { type: 'boolean', default: false },
     baseline: { type: 'string' },
     'max-regression': { type: 'string', default: '0.1' },
     'min-pass-rate': { type: 'string' }
@@ -63,6 +65,7 @@ async function main() {
     process.env.ANTHROPIC_MODEL = values.model;
     process.env.OPENAI_MODEL = values.model;
   }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const llm = createLlmClient();
   const agentConfig = loadAgentConfig();
   const results: EvalResultRecord[] = [];
@@ -78,13 +81,28 @@ async function main() {
       for (let repeat = 1; repeat <= repeats; repeat++) {
         const started = Date.now();
         let record: Omit<EvalResultRecord, 'category'>;
+        const renders = new Map<number, { render?: Buffer; diff?: Buffer }>();
         try {
           const result = await runAgent(
             { designPng, width: size.width, height: size.height, framework },
             llm,
             agentConfig,
-            () => undefined
+            (step) => {
+              if (step.iteration !== undefined && step.artifacts) {
+                renders.set(step.iteration, { render: step.artifacts.renderPng, diff: step.artifacts.diffPng });
+              }
+            }
           );
+          if (values['save-artifacts']) {
+            const dir = path.join(root, 'evals', 'artifacts', stamp, `${framework}-${fixture.id}-${repeat}`);
+            await mkdir(dir, { recursive: true });
+            await writeFile(path.join(dir, framework === 'angular' ? 'app.component.ts' : 'Component.tsx'), result.tsx);
+            if (result.css) await writeFile(path.join(dir, 'styles.css'), result.css);
+            await writeFile(path.join(dir, 'design.png'), designPng);
+            const best = renders.get(result.metrics.bestIteration);
+            if (best?.render) await writeFile(path.join(dir, 'render.png'), best.render);
+            if (best?.diff) await writeFile(path.join(dir, 'diff.png'), best.diff);
+          }
           record = {
             fixtureId: fixture.id,
             framework,
@@ -142,12 +160,20 @@ async function main() {
   const summaries = buildSummaries(results);
   const report: EvalReportFile = { meta, results, summaries };
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const file = `${stamp}-${llm.model.replace(/[^\w.-]/g, '_')}.json`;
   await mkdir(path.join(root, 'evals', 'results'), { recursive: true });
   await writeFile(path.join(root, 'evals', 'results', file), JSON.stringify(report, null, 2));
-  await writeFile(path.join(root, 'docs', 'evals.md'), renderMarkdown(meta, results, summaries));
-  console.log(`Saved evals/results/${file} and docs/evals.md`);
+  const markdown = renderMarkdown(meta, results, summaries);
+  const designCount = new Set(results.map((result) => result.fixtureId)).size;
+  if (designCount >= 10 || values.publish) {
+    await writeFile(path.join(root, 'docs', 'evals.md'), markdown);
+    console.log(`Saved evals/results/${file} and docs/evals.md`);
+  } else {
+    await writeFile(path.join(root, 'evals', 'results', file.replace(/\.json$/, '.md')), markdown);
+    console.log(
+      `Saved evals/results/${file}. docs/evals.md was not changed because ${designCount} design(s) is too few to publish, use --publish to override`
+    );
+  }
 
   if (values['save-db']) {
     await saveReport(report);

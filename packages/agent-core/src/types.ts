@@ -1,12 +1,19 @@
 export type Framework = 'react' | 'react-tailwind' | 'angular';
 
-export type StopReason = 'passed' | 'max_iterations' | 'budget_cost' | 'budget_time' | 'no_progress';
+export type StopReason =
+  | 'passed'
+  | 'max_iterations'
+  | 'budget_cost'
+  | 'budget_time'
+  | 'budget_tokens'
+  | 'no_progress';
 export type FinalStatus = 'passed' | 'failed' | 'budget_exceeded';
 
 export interface AgentConfig {
   maxIterations: number;
   maxCostUsd: number;
   maxSeconds: number;
+  maxTokens: number;
   similarityThreshold: number;
   a11yMaxBlocking: number;
 }

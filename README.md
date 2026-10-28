@@ -70,6 +70,8 @@ A finished run can be accepted, rejected, or revised with a plain-language note.
 - Health, JSON and Prometheus metrics endpoints, structured JSON logs, optional error reporting with Sentry
 - Paginated and filterable run list, and a side-by-side comparison of two eval reports in the UI
 - Public-demo controls: per-IP hourly limit, daily cost cap and an admin token for metrics
+- Bring your own key: each user enters their own provider key in the app, so the owner's key is never used and `.env` needs no key
+- A static demo build for Cloudflare Pages that replays saved runs and shows the evals with no server
 - Light and dark themes
 
 ## Tech stack
@@ -101,7 +103,7 @@ npm run dev:api
 npm run dev:web
 ```
 
-Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in `.env`, and set `LLM_PRICE_IN_PER_M` and `LLM_PRICE_OUT_PER_M` to your model's real prices so cost numbers are correct. `prisma migrate dev` asks for a migration name the first time and again after schema changes, and the generated `prisma/migrations` folder should be committed.
+You can set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in `.env` with `LLM_PRICE_IN_PER_M` and `LLM_PRICE_OUT_PER_M` set to your model's real prices, or skip the key and enter your own in the app under **API key**. `prisma migrate dev` asks for a migration name the first time and again after schema changes, and the generated `prisma/migrations` folder should be committed.
 
 Open http://localhost:3000, choose an output, upload a PNG or JPEG between 200x100 and 1600x2000 pixels, and watch the run.
 
@@ -136,6 +138,9 @@ The first process only enqueues. Start as many workers as you need with the seco
 | `OPENAI_BASE_URL`, `OPENAI_MAX_TOKENS_PARAM` | OpenAI's API, `max_completion_tokens` | Point the OpenAI client at any OpenAI-compatible server and set the name of its token limit field |
 | `LLM_PRICE_IN_PER_M`, `LLM_PRICE_OUT_PER_M` | `3`, `15` | USD per million tokens, used for cost tracking |
 | `LLM_RETRIES`, `LLM_RETRY_BASE_MS` | `3`, `2000` | Retries with backoff on rate limits (429) and overload (503) |
+| `ALLOW_SERVER_KEY` | on, but off in demo mode | Whether runs without a personal key may use the server's key |
+| `PERSONAL_KEYS` | `true` | Set `false` to turn off personal keys |
+| `AGENT_MAX_TOKENS` | `400000` | Token budget per run, independent of prices |
 | `AGENT_MAX_ITERATIONS` | `5` | Passes per run |
 | `AGENT_MAX_COST_USD` | `0.5` | Cost budget per run |
 | `AGENT_MAX_SECONDS` | `240` | Time budget per run |
@@ -191,6 +196,37 @@ A scheduled workflow runs the full suite nightly when the repository variable `N
 
 Results depend on the model, the prompt version and the fonts of the machine that rendered the fixtures, so every report records the model, prompt version and commit. Numbers appear in `docs/evals.md` after you run the suite.
 
+## Your own API key
+
+Nobody has to put a key in `.env`. The **API key** page lets each visitor choose a provider (Anthropic, OpenAI or Google Gemini), paste their own key and pick a model. Runs then use that person's account, not the server's.
+
+- The key stays in the browser. By default it lives in the session and disappears when the tab closes. A checkbox keeps it on the device instead.
+- The browser sends it in request headers (`x-llm-api-key` with the provider and model). The server keeps it in memory while the run is processed and then drops it. It is never written to the database, files or logs, and error messages are scrubbed of anything that looks like a key.
+- Only the three providers can receive it, at fixed addresses. The server accepts no custom URL from a client.
+- **Check key** sends one tiny request to the provider to confirm the key and model work.
+- Every run is also limited by a token budget (`AGENT_MAX_TOKENS`), so a personal key is protected even when the user enters no prices and the cost shows as $0.
+- A personal-key run does not count against the demo's hourly limit or daily cost cap, because it costs the owner nothing.
+
+For a public deployment, leave the key out of the server's environment. `DEMO_MODE=true` turns the server key off unless `ALLOW_SERVER_KEY=true`, and `ALLOW_SERVER_KEY=false` does the same on its own. Visitors without their own key then see a clear message. Personal keys need the in-process queue (`QUEUE=memory`), because a key held in memory cannot be handed to another worker process. Use https in front of the API so keys are encrypted in transit. A run that is still waiting when the server restarts fails with a clear message, because the key was not kept.
+
+## Static demo on Cloudflare Pages
+
+The web app can be built as a static copy that needs no server, no database and no key. It shows a landing page, replays of real saved runs and the eval reports. Visitors cannot start new runs there. It is free to host and cannot be abused, which suits a link on a CV.
+
+1. Run the full app locally and make a few good runs: React, React with Tailwind, Angular, and one that fails.
+2. Save each one as a replay:
+   ```bash
+   npm run build -w @designloop/api
+   npm run demo:export -w @designloop/api -- <runId> pricing-react "Pricing card, React"
+   ```
+3. Export the eval reports: `npm run evals:export`.
+4. Build the static site: `npm run build:static`. It writes `apps/web/out`. Check it with `npx serve apps/web/out`.
+5. Commit the exported files in `apps/web/public/demo` and `apps/web/public/data`, and publish.
+
+To deploy from GitHub, add the repository secrets `CLOUDFLARE_API_TOKEN` (a token with the Pages edit permission) and `CLOUDFLARE_ACCOUNT_ID`, and the repository variable `CLOUDFLARE_PAGES_PROJECT` with the project name. The `deploy-demo` workflow then builds and publishes on every push to `main` that touches the web app. To use the Cloudflare dashboard instead, connect the repository and set the build command to `npm install && npm run build:packages && npm run build:static`, the output directory to `apps/web/out`, and the variable `NODE_VERSION` to `22`.
+
+The static build uses links such as `/demo/view?slug=...` so every page can be plain files, and `apps/web/public/_headers` sets the security headers on Cloudflare Pages. Publishing the repository safely is covered in [docs/publishing.md](docs/publishing.md).
+
 ## Using a free or local model
 
 The OpenAI client works with any server that offers an OpenAI-compatible API and accepts images, so a paid key is not required to try the project.
@@ -234,12 +270,16 @@ Things to know before relying on a free option:
 | `Cannot find module '@designloop/shared'` | Run `npm run build:packages` |
 | Every run fails on type errors only | Set `TYPECHECK=off` to confirm, then send the first error line so the cause can be fixed |
 | Angular runs fail with `rendered nothing` | Look at the console errors in the trace, they come from the Angular compiler in the browser |
+| `Add your API key in Settings` | The server has no key of its own. Open the API key page and add yours |
+| `Your API key is no longer available` | The server restarted while the run was waiting. Start it again |
+| The static build fails on a dynamic route | Pages must use query links such as `/run?id=` and `/demo/view?slug=`, not path parameters |
+| `npm run check:secrets` fails | Remove the file or key it names, rotate any real key, and rewrite history if it was committed |
 | Runs stay `queued` | The API was started with `WORKER_ENABLED=false`, or `QUEUE=pgboss` has no worker process |
 | Sandbox runs fail with `docker: command not found` | Run the API on a host with Docker, and run `npm run sandbox:build` first |
 
 ## Security model
 
-The threat model, controls and what is not covered are in [SECURITY.md](SECURITY.md). In short: design text is treated as untrusted content, generated code is limited to an import allow list, the renderer blocks the network and can run in a throwaway container, uploads are decoded and re-encoded, and a public instance has rate and cost limits.
+The threat model, controls and what is not covered are in [SECURITY.md](SECURITY.md). Personal API keys are held in browser storage and in server memory only, as described above, and `npm run check:secrets` (also run in CI, and as a pre-commit hook with `npm run hooks`) fails if a key or a tracked `.env` is found in the repository. In short: design text is treated as untrusted content, generated code is limited to an import allow list, the renderer blocks the network and can run in a throwaway container, uploads are decoded and re-encoded, and a public instance has rate and cost limits.
 
 ## Testing and CI
 
@@ -252,6 +292,7 @@ npm run e2e -w @designloop/web
 - **Agent loop:** tests with a fake model and a fake renderer cover passing on a later pass, no-progress, cost budget, iteration limit, accessibility and type-error blocking, revisions, measured colors and the injection guard in prompts.
 - **Checks:** import allow list, remote CSS, Angular component shape, image detection, the type check and color measurement.
 - **Reports:** summaries, percentiles, failure categories, markdown, model comparison and regression detection.
+- **Personal keys:** header parsing and validation, secret redaction, the in-memory vault (single use, expiry, never printed), the fixed provider endpoints, token budget, demo limits that skip personal keys, and the key check endpoint hiding the key in errors.
 - **API:** Supertest against the real controllers with a fake database: validation, size limits, PNG and JPEG upload, file serving, path traversal, revisions, reviews, rate limit, admin token and eval endpoints.
 - **Web:** component tests with Jest and Testing Library, and Playwright end-to-end tests for the home page, saved-run replay and theme switch.
 

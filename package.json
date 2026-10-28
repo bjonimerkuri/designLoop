@@ -21,7 +21,12 @@
     "eval:compare": "npm run compare -w @designloop/evals --",
     "sandbox:build": "docker build -f Dockerfile.sandbox -t designloop-sandbox .",
     "db:push": "npm run prisma:push -w @designloop/api",
-    "doctor": "node scripts/doctor.mjs"
+    "doctor": "node scripts/doctor.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "hooks": "node scripts/install-hooks.mjs",
+    "build:static": "node scripts/build-static.mjs",
+    "evals:export": "node scripts/export-evals.mjs",
+    "verify": "npm run check:secrets && npm run lint && npm test"
   },
   "engines": {
     "node": ">=20"

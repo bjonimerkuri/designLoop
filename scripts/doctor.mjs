@@ -34,6 +34,14 @@ function canConnect(host, port, timeoutMs = 1500) {
   });
 }
 
+function tracked(file) {
+  try {
+    return execFileSync('git', ['ls-files', '--error-unmatch', file], { cwd: root, stdio: 'ignore' }) !== null;
+  } catch {
+    return false;
+  }
+}
+
 function run(command, args) {
   try {
     return execFileSync(command, args, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
@@ -51,7 +59,17 @@ const env = { ...parseEnv(path.join(root, '.env.example')), ...parseEnv(envFile)
 
 const provider = env.LLM_PROVIDER || (env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai');
 const keyName = provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY';
-record(Boolean(env[keyName]), `${keyName} is set (provider: ${provider})`, `Add ${keyName} to .env`);
+record(
+  Boolean(env[keyName]),
+  `${keyName} is set (provider: ${provider})`,
+  `Add ${keyName} to .env, or enter a key in the app under API key. Leave it out when visitors must bring their own`,
+  true
+);
+record(
+  !existsSync(path.join(root, '.git')) || !tracked('.env'),
+  '.env is not tracked by git',
+  'Run: git rm --cached .env, then rotate the key it contained'
+);
 record(
   Number(env.LLM_PRICE_IN_PER_M) > 0 && Number(env.LLM_PRICE_OUT_PER_M) > 0,
   'Model prices are set',

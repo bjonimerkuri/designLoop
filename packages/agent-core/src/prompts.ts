@@ -1,6 +1,6 @@
 import type { DesignTokens, Framework, GeneratedCode, LlmPart } from './types';
 
-export const PROMPT_VERSION = 'v3';
+export const PROMPT_VERSION = 'v4';
 
 export const ANALYSIS_SYSTEM = [
   'You analyze UI designs for a frontend engineer.',
@@ -10,6 +10,7 @@ export const ANALYSIS_SYSTEM = [
 const SHARED_RULES = [
   '- The page is rendered at the exact pixel size of the design with a body margin of 0. Match layout, spacing, colors, typography and text exactly.',
   '- Use semantic HTML, label every control, give images alt text, and keep text contrast at least 4.5:1.',
+  '- Unless the design clearly shows another typeface, set font-family to system-ui, sans-serif for all text, so widths match the design.',
   '- The code is type-checked in strict mode, so every value must have a valid type.'
 ];
 

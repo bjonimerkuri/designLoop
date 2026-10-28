@@ -115,7 +115,7 @@ export async function renderComponent(
     const host = framework === 'angular' ? '<app-root></app-root>' : '<div id="root"></div>';
     const html =
       '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Preview</title>' +
-      `<style>html,body{margin:0;padding:0}</style><style>${css}</style></head>` +
+      `<style>html,body{margin:0;padding:0}body{font-family:system-ui,sans-serif}</style><style>${css}</style></head>` +
       `<body>${host}<script>${js.replace(/<\/script/gi, '<\\/script')}</script></body></html>`;
 
     const context = await browser.newContext({ viewport: size, deviceScaleFactor: 1 });
@@ -149,7 +149,7 @@ export async function renderComponent(
 
       const renderPng = await page.screenshot({ type: 'png' });
 
-      const axe = await new AxeBuilder({ page })
+      const axe = await new AxeBuilder({ page: page as never })
         .disableRules(['region', 'landmark-one-main', 'page-has-heading-one'])
         .analyze();
       const a11y: A11yIssue[] = axe.violations.map((v) => ({

@@ -24,7 +24,7 @@ export function categorize(
   if (!record.compiled) return 'compile_error';
   if (record.consoleErrors > 0) return 'runtime_error';
   if (record.typeErrors > 0) return 'type_error';
-  if (record.stopReason === 'budget_cost' || record.stopReason === 'budget_time') return 'budget';
+  if (record.stopReason?.startsWith('budget')) return 'budget';
   if (record.similarity >= similarityThreshold && record.a11yBlocking > 0) return 'accessibility';
   if (record.similarity < similarityThreshold) return 'visual_mismatch';
   return 'other';

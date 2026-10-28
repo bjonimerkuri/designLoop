@@ -20,9 +20,20 @@ async function main() {
       const html = await readFile(path.join(root, 'fixtures', 'html', `${fixture.id}.html`), 'utf8');
       await page.setContent(html, { waitUntil: 'load' });
       await page.waitForTimeout(100);
+      const content = await page.evaluate(() => ({
+        width: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+        height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
+      }));
+      const width = Math.max(fixture.width, content.width);
+      const height = Math.max(fixture.height, content.height);
+      if (width !== fixture.width || height !== fixture.height) {
+        await page.setViewportSize({ width, height });
+        await page.waitForTimeout(50);
+        console.log(`${fixture.id}: content needs ${width}x${height}, larger than ${fixture.width}x${fixture.height}, so the design was made larger`);
+      }
       await page.screenshot({ path: path.join(root, 'fixtures', 'designs', `${fixture.id}.png`) });
       await page.close();
-      console.log(`${fixture.id} ${fixture.width}x${fixture.height}`);
+      console.log(`${fixture.id} ${width}x${height}`);
     }
   } finally {
     await browser.close();

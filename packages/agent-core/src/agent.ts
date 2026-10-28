@@ -97,6 +97,7 @@ export async function runAgent(
   const started = Date.now();
   let stepIndex = 0;
   let totalCost = 0;
+  let totalTokens = 0;
 
   const emit = async (step: Omit<StepRecord, 'index'>) => {
     await onStep({ ...step, index: stepIndex++ });
@@ -104,6 +105,7 @@ export async function runAgent(
 
   const budgetStop = (): StopReason | null => {
     if (totalCost >= config.maxCostUsd) return 'budget_cost';
+    if (totalTokens >= config.maxTokens) return 'budget_tokens';
     if (Date.now() - started >= config.maxSeconds * 1000) return 'budget_time';
     return null;
   };
@@ -148,6 +150,7 @@ export async function runAgent(
           maxTokens: 1500
         });
         totalCost += res.costUsd;
+        totalTokens += res.tokensIn + res.tokensOut;
         analysisCost += res.costUsd;
         analysisTokensIn += res.tokensIn;
         analysisTokensOut += res.tokensOut;
@@ -195,6 +198,7 @@ export async function runAgent(
         : generateParts(input, analysis, feedback);
       const res = await llm.complete({ system, parts, maxTokens: 6000 });
       totalCost += res.costUsd;
+      totalTokens += res.tokensIn + res.tokensOut;
       const code = parseCode(res.text, input.framework);
       await emit({
         type: 'generate',
@@ -295,7 +299,7 @@ export async function runAgent(
 
     const status: FinalStatus = passedAttempt
       ? 'passed'
-      : stopReason === 'budget_cost' || stopReason === 'budget_time'
+      : stopReason === 'budget_cost' || stopReason === 'budget_time' || stopReason === 'budget_tokens'
         ? 'budget_exceeded'
         : 'failed';
 

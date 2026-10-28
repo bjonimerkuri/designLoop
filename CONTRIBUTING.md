@@ -2,7 +2,7 @@
 
 ## Setup
 
-Follow the setup in the README, then run `npm test` and `npm run lint` before you push.
+Follow the setup in the README, then run `npm run hooks` once to block commits that contain keys, and run `npm test` and `npm run lint` before you push. Never commit `.env`.
 
 ## Pull requests
 
