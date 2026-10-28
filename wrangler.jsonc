@@ -1,6 +1,10 @@
 {
   "name": "designloop",
   "compatibility_date": "2026-10-01",
+  "vars": {
+    "NEXT_PUBLIC_REPO_URL": "https://github.com/bjonimerkuri/designloop",
+    "NODE_VERSION": "22"
+  },
   "assets": {
     "directory": "./apps/web/out"
   }
